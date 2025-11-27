@@ -65,6 +65,8 @@ pub struct Session<FS: Filesystem> {
     pub(crate) initialized: bool,
     /// True if the filesystem was destroyed (destroy operation done)
     pub(crate) destroyed: bool,
+    /// Optional sender for replies (used with cloned fds for multi-reader setups)
+    reply_sender: Option<ChannelSender>,
 }
 
 impl<FS: Filesystem> AsFd for Session<FS> {
@@ -120,6 +122,7 @@ impl<FS: Filesystem> Session<FS> {
             proto_minor: 0,
             initialized: false,
             destroyed: false,
+            reply_sender: None,
         })
     }
 
@@ -137,6 +140,7 @@ impl<FS: Filesystem> Session<FS> {
             proto_minor: 0,
             initialized: false,
             destroyed: false,
+            reply_sender: None,
         }
     }
 
@@ -146,7 +150,16 @@ impl<FS: Filesystem> Session<FS> {
     ///
     /// IMPORTANT: This should only be used with fds cloned from an already-initialized
     /// FUSE mount, as this session skips the INIT protocol.
-    pub fn from_fd_initialized(filesystem: FS, fd: OwnedFd, acl: SessionACL) -> Self {
+    ///
+    /// The `reply_sender` parameter is required for cloned fds because FUSE replies
+    /// must be written to the ORIGINAL /dev/fuse fd, not the cloned fd. Pass the
+    /// ChannelSender from the primary session's channel().sender().
+    pub fn from_fd_initialized(
+        filesystem: FS,
+        fd: OwnedFd,
+        reply_sender: ChannelSender,
+        acl: SessionACL,
+    ) -> Self {
         let ch = Channel::new(Arc::new(fd.into()));
         Session {
             filesystem,
@@ -158,6 +171,7 @@ impl<FS: Filesystem> Session<FS> {
             proto_minor: abi::FUSE_KERNEL_MINOR_VERSION,
             initialized: true,  // Skip INIT - caller guarantees mount is initialized
             destroyed: false,
+            reply_sender: Some(reply_sender),
         }
     }
 
@@ -172,11 +186,19 @@ impl<FS: Filesystem> Session<FS> {
         // it is reused immediately after dispatching to conserve memory and allocations.
         let mut buffer = vec![0; BUFFER_SIZE];
         let buf = aligned_sub_buf(&mut buffer, std::mem::align_of::<abi::fuse_in_header>());
+
+        // For multi-reader setups with cloned fds, replies must be written to the
+        // ORIGINAL fd, not the cloned fd. Use reply_sender if provided.
+        let sender = self
+            .reply_sender
+            .clone()
+            .unwrap_or_else(|| self.ch.sender());
+
         loop {
             // Read the next request from the given channel to kernel driver
             // The kernel driver makes sure that we get exactly one request per read
             match self.ch.receive(buf) {
-                Ok(size) => match Request::new(self.ch.sender(), &buf[..size]) {
+                Ok(size) => match Request::new(sender.clone(), &buf[..size]) {
                     // Dispatch request
                     Some(req) => req.dispatch(self),
                     // Quit loop on illegal request
