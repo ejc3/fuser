@@ -44,7 +44,8 @@ pub use session::{BackgroundSession, Session, SessionACL, SessionUnmounter};
 use std::cmp::max;
 use std::cmp::min;
 
-mod channel;
+/// Low-level FUSE communication channel
+pub mod channel;
 mod ll;
 mod mnt;
 mod notify;
