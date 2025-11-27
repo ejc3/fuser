@@ -17,6 +17,12 @@ use crate::reply::ReplySender;
 /// FUSE_DEV_IOC_CLONE ioctl number: _IOR(229, 0, uint32_t)
 /// This clones a /dev/fuse file descriptor for multi-threaded reading.
 /// See: https://www.kernel.org/doc/Documentation/filesystems/fuse.txt
+///
+/// Note: The ioctl request type varies by platform (i32 on most Linux, c_ulong on some).
+/// Using nix::ioctl_write_ptr! would be cleaner but we keep it simple with raw libc.
+#[cfg(target_env = "musl")]
+const FUSE_DEV_IOC_CLONE: libc::c_int = 0x8004e500u32 as libc::c_int;
+#[cfg(not(target_env = "musl"))]
 const FUSE_DEV_IOC_CLONE: libc::c_ulong = 0x8004e500;
 
 /// A raw communication channel to the FUSE kernel driver
