@@ -109,6 +109,7 @@ impl Channel {
     }
 }
 
+/// Sender for FUSE replies over a channel
 #[derive(Clone, Debug)]
 pub struct ChannelSender(Arc<File>);
 

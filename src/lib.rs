@@ -46,6 +46,9 @@ use std::cmp::min;
 
 /// Low-level FUSE communication channel
 pub mod channel;
+/// Experimental APIs
+#[cfg(feature = "experimental")]
+pub mod experimental;
 mod ll;
 mod mnt;
 mod notify;
