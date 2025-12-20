@@ -82,8 +82,7 @@ impl Channel {
     #[cfg(target_os = "linux")]
     pub fn clone_fd(&self) -> io::Result<OwnedFd> {
         // Open a new /dev/fuse fd
-        let fd =
-            unsafe { libc::open(b"/dev/fuse\0".as_ptr() as *const libc::c_char, libc::O_RDWR) };
+        let fd = unsafe { libc::open(c"/dev/fuse".as_ptr(), libc::O_RDWR) };
         if fd < 0 {
             return Err(io::Error::last_os_error());
         }
