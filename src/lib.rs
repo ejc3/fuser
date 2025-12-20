@@ -44,8 +44,7 @@ pub use session::{BackgroundSession, Session, SessionACL, SessionUnmounter};
 use std::cmp::max;
 use std::cmp::min;
 
-/// Low-level FUSE communication channel
-pub mod channel;
+mod channel;
 /// Experimental APIs
 #[cfg(feature = "experimental")]
 pub mod experimental;
