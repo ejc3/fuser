@@ -163,9 +163,9 @@ pub(crate) enum fuse_opcode {
     FUSE_COPY_FILE_RANGE = 47,
 
     // remap_file_range support (FICLONE/FICLONERANGE)
-    // Requires kernel patch - not yet upstream
+    // Opcode 54 - requires kernel patch, not yet upstream
     #[cfg(feature = "abi-7-28")]
-    FUSE_REMAP_FILE_RANGE = 53,
+    FUSE_REMAP_FILE_RANGE = 54,
 
     #[cfg(target_os = "macos")]
     FUSE_SETVOLNAME = 61,
