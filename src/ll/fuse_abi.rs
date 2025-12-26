@@ -321,9 +321,9 @@ pub enum fuse_opcode {
     FUSE_COPY_FILE_RANGE = 47,
 
     // remap_file_range support (FICLONE/FICLONERANGE)
-    // Requires kernel patch - not yet upstream
+    // Opcode 54 - requires kernel patch, not yet upstream
     #[cfg(feature = "abi-7-28")]
-    FUSE_REMAP_FILE_RANGE = 53,
+    FUSE_REMAP_FILE_RANGE = 54,
 
     #[cfg(target_os = "macos")]
     FUSE_SETVOLNAME = 61,
@@ -391,7 +391,7 @@ impl TryFrom<u32> for fuse_opcode {
             #[cfg(feature = "abi-7-28")]
             47 => Ok(fuse_opcode::FUSE_COPY_FILE_RANGE),
             #[cfg(feature = "abi-7-28")]
-            53 => Ok(fuse_opcode::FUSE_REMAP_FILE_RANGE),
+            54 => Ok(fuse_opcode::FUSE_REMAP_FILE_RANGE),
 
             #[cfg(target_os = "macos")]
             61 => Ok(fuse_opcode::FUSE_SETVOLNAME),
