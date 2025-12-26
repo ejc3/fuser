@@ -162,6 +162,11 @@ pub(crate) enum fuse_opcode {
     FUSE_LSEEK = 46,
     FUSE_COPY_FILE_RANGE = 47,
 
+    // remap_file_range support (FICLONE/FICLONERANGE)
+    // Requires kernel patch - not yet upstream
+    #[cfg(feature = "abi-7-28")]
+    FUSE_REMAP_FILE_RANGE = 53,
+
     #[cfg(target_os = "macos")]
     FUSE_SETVOLNAME = 61,
     #[cfg(target_os = "macos")]
@@ -759,4 +764,20 @@ pub(crate) struct fuse_copy_file_range_in {
     pub(crate) off_out: i64,
     pub(crate) len: u64,
     pub(crate) flags: u64,
+}
+
+/// Remap file range input (FICLONE/FICLONERANGE support)
+/// Requires kernel patch - not yet upstream
+#[repr(C)]
+#[derive(Debug, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_remap_file_range_in {
+    pub fh_in: u64,
+    pub off_in: i64,
+    pub nodeid_out: u64,
+    pub fh_out: u64,
+    pub off_out: i64,
+    pub len: u64,
+    /// REMAP_FILE_DEDUP (1), REMAP_FILE_CAN_SHORTEN (2)
+    pub remap_flags: u32,
+    pub padding: u32,
 }
