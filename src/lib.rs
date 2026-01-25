@@ -1016,7 +1016,7 @@ pub trait Filesystem: Send + Sync + 'static {
     /// Requires kernel patch - not yet upstream.
     fn remap_file_range(
         &mut self,
-        _req: &Request<'_>,
+        _req: &Request,
         ino_in: u64,
         fh_in: u64,
         offset_in: i64,
@@ -1032,7 +1032,7 @@ pub trait Filesystem: Send + Sync + 'static {
             offset_in: {offset_in}, ino_out: {ino_out:#x?}, fh_out: {fh_out}, \
             offset_out: {offset_out}, len: {len}, remap_flags: {remap_flags})"
         );
-        reply.error(ENOSYS);
+        reply.error(Errno::ENOSYS);
     }
 
     /// macOS only: Rename the volume. Set `fuse_init_out.flags` during init to

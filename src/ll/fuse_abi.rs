@@ -770,14 +770,14 @@ pub(crate) struct fuse_copy_file_range_in {
 /// Requires kernel patch - not yet upstream
 #[repr(C)]
 #[derive(Debug, FromBytes, KnownLayout, Immutable)]
-pub struct fuse_remap_file_range_in {
-    pub fh_in: u64,
-    pub off_in: i64,
-    pub nodeid_out: u64,
-    pub fh_out: u64,
-    pub off_out: i64,
-    pub len: u64,
+pub(crate) struct fuse_remap_file_range_in {
+    pub(crate) fh_in: u64,
+    pub(crate) off_in: i64,
+    pub(crate) nodeid_out: u64,
+    pub(crate) fh_out: u64,
+    pub(crate) off_out: i64,
+    pub(crate) len: u64,
     /// REMAP_FILE_DEDUP (1), REMAP_FILE_CAN_SHORTEN (2)
-    pub remap_flags: u32,
-    pub padding: u32,
+    pub(crate) remap_flags: u32,
+    pub(crate) padding: u32,
 }

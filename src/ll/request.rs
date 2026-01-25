@@ -1562,31 +1562,29 @@ mod op {
     /// Requires kernel patch - not yet upstream
     #[cfg(feature = "abi-7-28")]
     #[derive(Debug, Clone, Copy)]
-    pub struct RemapFileRangeFile {
-        pub inode: INodeNo,
-        pub file_handle: FileHandle,
-        pub offset: i64,
+    pub(crate) struct RemapFileRangeFile {
+        pub(crate) inode: INodeNo,
+        pub(crate) file_handle: FileHandle,
+        pub(crate) offset: i64,
     }
     #[cfg(feature = "abi-7-28")]
     #[derive(Debug)]
-    pub struct RemapFileRange<'a> {
+    pub(crate) struct RemapFileRange<'a> {
         header: &'a fuse_in_header,
         arg: &'a fuse_remap_file_range_in,
     }
     #[cfg(feature = "abi-7-28")]
-    impl_request!(RemapFileRange<'a>);
-    #[cfg(feature = "abi-7-28")]
     impl RemapFileRange<'_> {
         /// File and offset to remap data from
-        pub fn src(&self) -> RemapFileRangeFile {
+        pub(crate) fn src(&self) -> RemapFileRangeFile {
             RemapFileRangeFile {
-                inode: self.nodeid(),
+                inode: INodeNo(self.header.nodeid),
                 file_handle: FileHandle(self.arg.fh_in),
                 offset: self.arg.off_in,
             }
         }
         /// File and offset to remap data to
-        pub fn dest(&self) -> RemapFileRangeFile {
+        pub(crate) fn dest(&self) -> RemapFileRangeFile {
             RemapFileRangeFile {
                 inode: INodeNo(self.arg.nodeid_out),
                 file_handle: FileHandle(self.arg.fh_out),
@@ -1594,11 +1592,11 @@ mod op {
             }
         }
         /// Number of bytes to remap (0 = to end of file)
-        pub fn len(&self) -> u64 {
+        pub(crate) fn len(&self) -> u64 {
             self.arg.len
         }
         /// REMAP_FILE_DEDUP (1), REMAP_FILE_CAN_SHORTEN (2)
-        pub fn remap_flags(&self) -> u32 {
+        pub(crate) fn remap_flags(&self) -> u32 {
             self.arg.remap_flags
         }
     }
