@@ -524,7 +524,7 @@ impl<'a> RequestWithSender<'a> {
             ll::Operation::RemapFileRange(x) => {
                 let (i, o) = (x.src(), x.dest());
                 se.filesystem.remap_file_range(
-                    self,
+                    self.request_header(),
                     i.inode.into(),
                     i.file_handle.into(),
                     i.offset,
