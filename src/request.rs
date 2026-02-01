@@ -523,7 +523,7 @@ impl<'a> RequestWithSender<'a> {
             #[cfg(feature = "abi-7-28")]
             ll::Operation::RemapFileRange(x) => {
                 let (i, o) = (x.src(), x.dest());
-                se.filesystem.remap_file_range(
+                filesystem.remap_file_range(
                     self.request_header(),
                     i.inode.into(),
                     i.file_handle.into(),
