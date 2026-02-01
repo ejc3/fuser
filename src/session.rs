@@ -257,8 +257,13 @@ impl<FS: Filesystem> Session<FS> {
         const FUSE_DEV_IOC_CLONE: libc::Ioctl = 0x8004_e500u32 as libc::Ioctl;
 
         let src_fd = self.as_fd().as_raw_fd();
-        let ret =
-            unsafe { libc::ioctl(new_fuse.as_raw_fd(), FUSE_DEV_IOC_CLONE, &src_fd as *const _) };
+        let ret = unsafe {
+            libc::ioctl(
+                new_fuse.as_raw_fd(),
+                FUSE_DEV_IOC_CLONE,
+                &src_fd as *const _,
+            )
+        };
         if ret < 0 {
             return Err(io::Error::last_os_error());
         }
