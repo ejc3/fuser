@@ -1558,6 +1558,49 @@ mod op {
         }
     }
 
+    /// Remap file range (FICLONE/FICLONERANGE support)
+    /// Requires kernel patch - not yet upstream
+    #[cfg(feature = "abi-7-28")]
+    #[derive(Debug, Clone, Copy)]
+    pub(crate) struct RemapFileRangeFile {
+        pub(crate) inode: INodeNo,
+        pub(crate) file_handle: FileHandle,
+        pub(crate) offset: i64,
+    }
+    #[cfg(feature = "abi-7-28")]
+    #[derive(Debug)]
+    pub(crate) struct RemapFileRange<'a> {
+        header: &'a fuse_in_header,
+        arg: &'a fuse_remap_file_range_in,
+    }
+    #[cfg(feature = "abi-7-28")]
+    impl RemapFileRange<'_> {
+        /// File and offset to remap data from
+        pub(crate) fn src(&self) -> RemapFileRangeFile {
+            RemapFileRangeFile {
+                inode: INodeNo(self.header.nodeid),
+                file_handle: FileHandle(self.arg.fh_in),
+                offset: self.arg.off_in,
+            }
+        }
+        /// File and offset to remap data to
+        pub(crate) fn dest(&self) -> RemapFileRangeFile {
+            RemapFileRangeFile {
+                inode: INodeNo(self.arg.nodeid_out),
+                file_handle: FileHandle(self.arg.fh_out),
+                offset: self.arg.off_out,
+            }
+        }
+        /// Number of bytes to remap (0 = to end of file)
+        pub(crate) fn len(&self) -> u64 {
+            self.arg.len
+        }
+        /// REMAP_FILE_DEDUP (1), REMAP_FILE_CAN_SHORTEN (2)
+        pub(crate) fn remap_flags(&self) -> u32 {
+            self.arg.remap_flags
+        }
+    }
+
     /// `MacOS` only: Rename the volume. Set `fuse_init_out.flags` during init to
     /// `FUSE_VOL_RENAME` to enable
     #[cfg(target_os = "macos")]
@@ -1849,6 +1892,11 @@ mod op {
                 header,
                 arg: data.fetch()?,
             }),
+            #[cfg(feature = "abi-7-28")]
+            fuse_opcode::FUSE_REMAP_FILE_RANGE => Operation::RemapFileRange(RemapFileRange {
+                header,
+                arg: data.fetch()?,
+            }),
 
             #[cfg(target_os = "macos")]
             fuse_opcode::FUSE_SETVOLNAME => Operation::SetVolName(SetVolName {
@@ -1923,6 +1971,8 @@ pub(crate) enum Operation<'a> {
     Rename2(Rename2<'a>),
     Lseek(Lseek<'a>),
     CopyFileRange(CopyFileRange<'a>),
+    #[cfg(feature = "abi-7-28")]
+    RemapFileRange(RemapFileRange<'a>),
 
     #[cfg(target_os = "macos")]
     SetVolName(SetVolName<'a>),
@@ -2098,6 +2148,15 @@ impl fmt::Display for Operation<'_> {
                 x.src(),
                 x.dest(),
                 x.len()
+            ),
+            #[cfg(feature = "abi-7-28")]
+            Operation::RemapFileRange(x) => write!(
+                f,
+                "REMAP_FILE_RANGE src {:?}, dest {:?}, len {}, flags {:#x}",
+                x.src(),
+                x.dest(),
+                x.len(),
+                x.remap_flags()
             ),
 
             #[cfg(target_os = "macos")]

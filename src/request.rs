@@ -520,6 +520,22 @@ impl<'a> RequestWithSender<'a> {
                     self.reply(),
                 );
             }
+            #[cfg(feature = "abi-7-28")]
+            ll::Operation::RemapFileRange(x) => {
+                let (i, o) = (x.src(), x.dest());
+                filesystem.remap_file_range(
+                    self.request_header(),
+                    i.inode.into(),
+                    i.file_handle.into(),
+                    i.offset,
+                    o.inode.into(),
+                    o.file_handle.into(),
+                    o.offset,
+                    x.len(),
+                    x.remap_flags(),
+                    self.reply(),
+                );
+            }
             #[cfg(target_os = "macos")]
             ll::Operation::SetVolName(x) => {
                 filesystem.setvolname(self.request_header(), x.name(), self.reply());
