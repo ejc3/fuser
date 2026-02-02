@@ -9,6 +9,7 @@ use std::borrow::Cow;
 use std::fs::File;
 use std::io;
 use std::os::fd::AsFd;
+use std::os::fd::AsRawFd;
 use std::os::fd::BorrowedFd;
 use std::os::fd::OwnedFd;
 use std::path::Path;
@@ -201,6 +202,77 @@ impl<FS: Filesystem> Session<FS> {
         }
     }
 
+    /// Create a session from a cloned file descriptor for multi-threaded reading.
+    ///
+    /// The cloned fd must come from `clone_fd()` on an already-initialized session.
+    /// This session shares the mount with the original but can process requests
+    /// in parallel from a separate thread.
+    ///
+    /// If `proto_version` is `None`, uses the maximum supported version.
+    /// For accurate version tracking, pass the result of `proto_version()`
+    /// from the primary session after handshake.
+    pub fn from_fd_initialized(
+        filesystem: FS,
+        fd: OwnedFd,
+        acl: SessionACL,
+        proto_version: Option<Version>,
+    ) -> Self {
+        let ch = Channel::new(Arc::new(DevFuse(File::from(fd))));
+        Session {
+            filesystem: FilesystemHolder {
+                fs: Some(filesystem),
+            },
+            ch,
+            mount: UmountOnDrop {
+                mount: Arc::new(Mutex::new(None)),
+            },
+            allowed: acl,
+            session_owner: geteuid(),
+            proto_version: Some(proto_version.unwrap_or(Version(
+                abi::FUSE_KERNEL_VERSION,
+                abi::FUSE_KERNEL_MINOR_VERSION,
+            ))),
+        }
+    }
+
+    /// Clone the FUSE device file descriptor for multi-threaded request processing.
+    ///
+    /// Each cloned fd can be used by a separate thread to read and process FUSE
+    /// requests in parallel. The kernel distributes requests across all readers.
+    ///
+    /// Only available on Linux.
+    #[cfg(target_os = "linux")]
+    pub fn clone_fd(&self) -> io::Result<OwnedFd> {
+        use std::fs::OpenOptions;
+        use std::os::unix::fs::OpenOptionsExt;
+
+        let new_fuse = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .custom_flags(libc::O_CLOEXEC)
+            .open("/dev/fuse")?;
+
+        // FUSE_DEV_IOC_CLONE = _IOC(_IOC_WRITE, 229, 0, 4)
+        #[allow(overflowing_literals)]
+        const FUSE_DEV_IOC_CLONE: libc::Ioctl = 0x8004_e500u32 as libc::Ioctl;
+
+        let src_fd = self.as_fd().as_raw_fd();
+        let ret =
+            unsafe { libc::ioctl(new_fuse.as_raw_fd(), FUSE_DEV_IOC_CLONE, &src_fd as *const _) };
+        if ret < 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        Ok(new_fuse.into())
+    }
+
+    /// Returns the protocol version negotiated with the kernel.
+    ///
+    /// Returns `None` if the handshake hasn't completed yet.
+    pub fn proto_version(&self) -> Option<Version> {
+        self.proto_version
+    }
+
     /// Run the session loop in a background thread. If the returned handle is dropped,
     /// the filesystem is unmounted and the given session ends.
     pub fn spawn(self) -> io::Result<BackgroundSession> {
@@ -221,8 +293,11 @@ impl<FS: Filesystem> Session<FS> {
     /// may run concurrent by spawning threads.
     /// # Errors
     /// Returns any final error when the session comes to an end.
-    pub(crate) fn run(mut self) -> io::Result<()> {
-        self.handshake()?;
+    pub fn run(mut self) -> io::Result<()> {
+        // Skip handshake if already initialized (from_fd_initialized sets proto_version)
+        if self.proto_version.is_none() {
+            self.handshake()?;
+        }
 
         let ret = self.event_loop();
 
@@ -238,8 +313,13 @@ impl<FS: Filesystem> Session<FS> {
         }
     }
 
-    /// Return `Some` if reply to `FUSE_DESTROY` needs to be sent.
-    fn event_loop(&self) -> io::Result<Option<ReplyEmpty>> {
+    /// Process FUSE requests until the filesystem is destroyed or unmounted.
+    ///
+    /// This can be called from multiple threads with cloned file descriptors
+    /// (via `clone_fd` and `from_fd_initialized`) for parallel request processing.
+    ///
+    /// Returns `Some(ReplyEmpty)` if FUSE_DESTROY was received and needs a reply.
+    pub fn event_loop(&self) -> io::Result<Option<ReplyEmpty>> {
         // Buffer for receiving requests from the kernel. Only one is allocated and
         // it is reused immediately after dispatching to conserve memory and allocations.
         let mut buf = FuseReadBuf::new();
@@ -272,7 +352,11 @@ impl<FS: Filesystem> Session<FS> {
         }
     }
 
-    fn handshake(&mut self) -> io::Result<()> {
+    /// Perform the FUSE protocol handshake with the kernel.
+    ///
+    /// This must be called before `event_loop()` on the primary session.
+    /// After handshake completes, `proto_version()` returns the negotiated version.
+    pub fn handshake(&mut self) -> io::Result<()> {
         let mut buf = FuseReadBuf::new();
         let buf = buf.as_mut();
 
