@@ -307,7 +307,7 @@ impl<FS: Filesystem> Session<FS> {
     }
 
     fn handshake(&mut self) -> io::Result<()> {
-        let mut buf = FuseReadBuf::new();
+        let mut buf = FuseReadBuf::new()?;
         let buf = buf.as_mut();
 
         loop {
@@ -498,7 +498,7 @@ impl<FS: Filesystem> SessionEventLoop<FS> {
     fn event_loop(&self) -> io::Result<()> {
         // Buffer for receiving requests from the kernel. Only one is allocated and
         // it is reused immediately after dispatching to conserve memory and allocations.
-        let mut buf = FuseReadBuf::new();
+        let mut buf = FuseReadBuf::new()?;
         let buf = buf.as_mut();
         loop {
             // Read the next request from the given channel to kernel driver
